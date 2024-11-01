@@ -1,0 +1,641 @@
+<html><head><base href=""/>
+    <title>Advanced Diffusion Model Generator with Sound</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a0f1a;
+            color: #ff6600;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background-color: #000000;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(255, 102, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1, h3 {
+            text-align: center;
+            color: #ff6600;
+            text-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .halloween-emoji {
+            font-size: 1.2em;
+            margin: 0 5px;
+        }
+
+        #visualization {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #ff6600;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .control-panel {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            background-color: #330000;
+            color: #ff6600;
+            border: 1px solid #ff6600;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button.spooky {
+            background-color: #660000;
+            border-color: #ff3300;
+            text-shadow: 0 0 5px #ff0000;
+        }
+
+        button:hover {
+            background-color: #440000;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
+        }
+
+        button.spooky:hover {
+            background-color: #990000;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+        }
+
+        .audio-controls {
+            background-color: #001100;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid #ff6600;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: #003300;
+            height: 5px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #ff6600;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(255, 102, 0, 0.5);
+        }
+
+        .parameter-display {
+            display: flex;
+            justify-content: space-between;
+            color: #ff6600;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        #status {
+            text-align: center;
+            margin-top: 15px;
+            color: #ff6600;
+            font-style: italic;
+            text-shadow: 0 0 10px #ff0000;
+            font-weight: bold;
+        }
+
+        .visualizer {
+            height: 50px;
+            background: #001100;
+            margin: 10px 0;
+            border: 1px solid #ff6600;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .visualizer canvas {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #customShader {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #0d0d0d;
+            border: 1px solid #ff6600;
+            color: #ff6600;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            height: 200px;
+            resize: vertical;
+        }
+
+        select {
+            background-color: #003300;
+            color: #ff6600;
+            border: 1px solid #ff6600;
+            padding: 8px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎃 Audio Visual Synthesizer 👻</h1>
+        
+        <div id="visualization">
+            <canvas id="drawing-canvas"></canvas>
+            <canvas id="mainCanvas"></canvas>
+        </div>
+
+        <div class="control-panel">
+            <div class="button-group">
+                <button onclick="toggleSound()">Toggle Sound</button>
+                <button onclick="startDraw()">Start Visual</button>
+                <button onclick="stopDraw()">Stop Visual</button>
+                <button onclick="resetDraw()">Reset</button>
+                <button onclick="generateMathPattern()">Math Pattern</button>
+                <button onclick="randomizePattern()">Random Shader</button>
+                <button class="spooky" onclick="playSpookySound()">😱 Emit Spooky Sound 💀</button>
+            </div>
+
+            <div class="audio-controls">
+                <h3>Sound Controls</h3>
+
+                <div class="slider-container">
+                    <label>Master Volume</label>
+                    <input type="range" id="masterVolume" min="0" max="1" step="0.01" value="0.5">
+                    <div class="parameter-display">
+                        <span>0%</span>
+                        <span id="volumeValue">50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <div class="slider-container">
+                    <label>Frequency Range</label>
+                    <input type="range" id="freqRange" min="20" max="2000" step="1" value="440">
+                    <div class="parameter-display">
+                        <span>20Hz</span>
+                        <span id="freqValue">440Hz</span>
+                        <span>2000Hz</span>
+                    </div>
+                </div>
+
+                <div class="preset-section">
+                    <select id="presetSelect" onchange="applyPreset()">
+                        <option value="">Select a Preset</option>
+                        <option value="mandelbrot">Mandelbrot Set</option>
+                        <option value="julia">Julia Set</option>
+                    </select>
+                </div>
+
+                <div class="upload-section">
+                    <label for="customShader">Custom Drawing Code (JavaScript):</label>
+                    <textarea id="customShader" placeholder="Example: return { r: 255 * x, g: 255 * y, b: 128, a: 255 };"></textarea>
+                    <button onclick="applyCustomShader()">Apply Code</button>
+                </div>
+
+                <div class="visualizer">
+                    <canvas id="audioVisualizer"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="status">Ready to generate sound...</div>
+    </div>
+
+    <script>
+        let audioContext;
+        let oscillator;
+        let gainNode;
+        let analyser;
+        let isPlaying = false;
+        let animationId;
+        let time = 0;
+        let customDrawFunction = defaultDrawFunction;
+        let spookyBuffer;
+
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const visualizerCanvas = document.getElementById('audioVisualizer');
+
+        const drawCtx = drawingCanvas.getContext('2d');
+        const mainCtx = mainCanvas.getContext('2d');
+        const visualizer = visualizerCanvas.getContext('2d');
+
+        function animate() {
+            if (!isPlaying && !animationId) return;
+
+            if (document.visibilityState === 'visible') {
+                const freq = oscillator?.frequency.value || 440;
+                generateVisualization(freq);
+
+                if (isPlaying && analyser) {
+                    updateAudioVisualizer();
+                }
+            }
+
+            time += 0.02;
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function startDraw() {
+            if (!animationId) {
+                animate();
+            }
+            document.getElementById('status').textContent = 'Animation running...';
+        }
+
+        function stopDraw() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            document.getElementById('status').textContent = 'Animation stopped';
+        }
+
+        function updateAudioVisualizer() {
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArray);
+
+            visualizer.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            visualizer.beginPath();
+            
+            const sliceWidth = visualizerCanvas.width / bufferLength;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i += 2) {
+                const v = dataArray[i] / 128.0;
+                const y = v * visualizerCanvas.height / 2;
+                
+                i === 0 ? visualizer.moveTo(x, y) : visualizer.lineTo(x, y);
+                x += sliceWidth * 2;
+            }
+
+            visualizer.strokeStyle = '#ff6600';
+            visualizer.stroke();
+        }
+
+        function generateVisualization() {
+            const width = drawingCanvas.width;
+            const height = drawingCanvas.height;
+            const imageData = drawCtx.createImageData(width, height);
+            const data = imageData.data;
+            const freq = oscillator?.frequency.value || 440;
+
+            const chunkSize = width * 4;
+            for (let j = 0; j < height; j++) {
+                const y = (j / height) * 2 - 1;
+                for (let i = 0; i < width; i++) {
+                    const x = (i / width) * 2 - 1;
+                    const index = (j * width + i) * 4;
+
+                    let color;
+                    try {
+                        color = customDrawFunction?.(x, y, time, freq) || defaultDrawFunction(x, y, time, freq);
+                    } catch (e) {
+                        color = { r: 0, g: 0, b: 0, a: 255 };
+                    }
+
+                    data.set([color.r, color.g, color.b, color.a], index);
+                }
+            }
+
+            drawCtx.putImageData(imageData, 0, 0);
+
+            if (oscillator) {
+                const baseFreq = oscillator.frequency.value;
+                const spookyMod = Math.sin(time * 0.5) * 50 + Math.cos(time * 0.3) * 30;
+                oscillator.frequency.value = baseFreq + spookyMod;
+            }
+        }
+
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            oscillator = audioContext.createOscillator();
+            gainNode = audioContext.createGain();
+            analyser = audioContext.createAnalyser();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(analyser);
+            analyser.connect(audioContext.destination);
+
+            analyser.fftSize = 2048;
+            gainNode.gain.value = document.getElementById('masterVolume').value;
+            oscillator.frequency.value = document.getElementById('freqRange').value;
+            
+            oscillator.start();
+        }
+
+        function toggleSound() {
+            if (!audioContext) {
+                initAudio();
+                isPlaying = true;
+                document.getElementById('status').textContent = 'Sound: ON';
+                animate();
+            } else if (audioContext.state === 'suspended') {
+                audioContext.resume();
+                isPlaying = true;
+                document.getElementById('status').textContent = 'Sound: ON';
+            } else if (audioContext.state === 'running') {
+                audioContext.suspend();
+                isPlaying = false;
+                document.getElementById('status').textContent = 'Sound: OFF';
+            }
+        }
+
+        document.getElementById('masterVolume').addEventListener('input', (e) => {
+            if (gainNode) {
+                gainNode.gain.value = e.target.value;
+                document.getElementById('volumeValue').textContent = `${Math.round(e.target.value * 100)}%`;
+            }
+        });
+
+        document.getElementById('freqRange').addEventListener('input', (e) => {
+            if (oscillator) {
+                const newFreq = parseFloat(e.target.value);
+                oscillator.frequency.value = newFreq;
+                document.getElementById('freqValue').textContent = `${newFreq}Hz`;
+                
+                if (customDrawFunction) {
+                    generateVisualization(newFreq);
+                }
+            }
+        });
+
+        async function loadSpookySound() {
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            try {
+                const response = await fetch('https://api.soundcloud.com/tracks/123456789/stream');
+                const arrayBuffer = await response.arrayBuffer();
+                spookyBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            } catch (e) {
+                console.error('Failed to load spooky sound:', e);
+                const length = audioContext.sampleRate * 2.0;
+                spookyBuffer = audioContext.createBuffer(1, length, audioContext.sampleRate);
+                const channelData = spookyBuffer.getChannelData(0);
+                
+                for (let i = 0; i < length; i++) {
+                    const t = i / audioContext.sampleRate;
+                    channelData[i] = 
+                        Math.sin(440 * t * Math.exp(-t * 2)) *
+                        Math.exp(-t * 3) *
+                        (1 + Math.sin(5 * t)) *
+                        0.5;
+                }
+            }
+        }
+
+        function playSpookySound() {
+            if (!spookyBuffer) {
+                loadSpookySound();
+                return;
+            }
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = spookyBuffer;
+            
+            const spookyGain = audioContext.createGain();
+            spookyGain.gain.value = gainNode.gain.value;
+            
+            source.connect(spookyGain);
+            spookyGain.connect(analyser);
+            
+            source.start();
+            document.getElementById('status').textContent = '👻 Spooky sound played! 🦇';
+        }
+
+        function generateRandomMathExpression() {
+            const operators = ['+', '-', '*', '/', '%'];
+            const spookyFunctions = [
+                'Math.sin', 'Math.cos', 'Math.tan', 
+                '(x => Math.pow(Math.abs(x), 0.5))',
+                '(x => Math.tanh(x * 3))',
+                '(x => x * Math.sin(1/x))'
+            ];
+            const variables = ['x', 'y', 'time', 'freq', 'Math.PI'];
+            
+            function generateSpookyTerm(depth = 0) {
+                if (depth > 3) {
+                    return variables[Math.floor(Math.random() * variables.length)];
+                }
+                
+                const rand = Math.random();
+                if (rand < 0.4) {
+                    const func = spookyFunctions[Math.floor(Math.random() * spookyFunctions.length)];
+                    const inner = generateSpookyTerm(depth + 1);
+                    return `${func}(${inner})`;
+                } else if (rand < 0.7) {
+                    const v = variables[Math.floor(Math.random() * variables.length)];
+                    const scale = (Math.random() * 13 + 6.66).toFixed(2);
+                    return `(${v} * ${scale})`;
+                } else {
+                    const left = generateSpookyTerm(depth + 1);
+                    const right = generateSpookyTerm(depth + 1);
+                    const op = operators[Math.floor(Math.random() * operators.length)];
+                    return `(${left} ${op} ${right})`;
+                }
+            }
+            
+            return {
+                r: generateSpookyTerm(),
+                g: generateSpookyTerm(), 
+                b: generateSpookyTerm(),
+                freqMod: generateSpookyTerm()
+            };
+        }
+
+        function generateMathPattern() {
+            const pattern = generateRandomMathExpression();
+            const shaderCode = `
+                const r = Math.abs((${pattern.r}) * 255) % 255;
+                const g = Math.abs((${pattern.g}) * 255) % 255;
+                const b = Math.abs((${pattern.b}) * 255) % 255;
+                
+                const freqMod = Math.abs((${pattern.freqMod}) * 100 + 440);
+                if(oscillator) {
+                    oscillator.frequency.value = freqMod;
+                }
+                
+                return { r, g, b, a: 255 };
+            `;
+            
+            document.getElementById('customShader').value = shaderCode;
+            applyCustomShader();
+            document.getElementById('status').textContent = 'Generated new mathematical pattern';
+        }
+
+        function randomizePattern() {
+            const { shaderCode, audioCode } = generateRandomMathExpression();
+            document.getElementById('customShader').value = shaderCode;
+            applyCustomShader();
+
+            if (oscillator) {
+                try {
+                    const x = Math.random() * 2 - 1;
+                    const y = Math.random() * 2 - 1;
+                    const time = performance.now() / 1000;
+                    let audioFreq;
+                    eval(audioCode);
+                    oscillator.frequency.value = audioFreq;
+                    document.getElementById('freqRange').value = audioFreq;
+                    document.getElementById('freqValue').textContent = `${Math.round(audioFreq)}Hz`;
+                } catch (e) {
+                    console.error('Error in audio code:', e);
+                    document.getElementById('status').textContent = 'Error in audio code';
+                }
+            }
+
+            document.getElementById('status').textContent = 'Applied new random shader and synchronized sound';
+        }
+
+        function applyCustomShader() {
+            const shaderCode = document.getElementById('customShader').value;
+            try {
+                customDrawFunction = new Function('x', 'y', 'time', 'freq', `
+                    ${shaderCode}
+                `);
+                if (!animationId) {
+                    animate();
+                }
+                document.getElementById('status').textContent = 'Custom shader applied successfully';
+            } catch (e) {
+                console.error('Error in custom shader code:', e);
+                document.getElementById('status').textContent = 'Error in custom shader code';
+            }
+        }
+
+        function resetDraw() {
+            stopDraw();
+            time = 0.0;
+            drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            if (oscillator) {
+                oscillator.frequency.value = 440;
+                document.getElementById('freqRange').value = 440;
+                document.getElementById('freqValue').textContent = '440Hz';
+            }
+            if (gainNode) {
+                gainNode.gain.value = 0.5;
+                document.getElementById('masterVolume').value = 0.5;
+                document.getElementById('volumeValue').textContent = '50%';
+            }
+            customDrawFunction = defaultDrawFunction;
+            document.getElementById('customShader').value = '';
+            generateVisualization();
+        }
+
+        function applyPreset() {
+            // Preset logic to be defined
+        }
+
+        function defaultDrawFunction(x, y, time, freq) {
+            const factor = freq / 440;
+            const spookyPhase = Math.sin(time * 0.1) * Math.PI;
+            const r = Math.sin(x * 13 * factor + spookyPhase) * 127 + 128;
+            const g = Math.cos(y * 6.66 * factor + time) * 64;
+            const b = Math.sin((x + y) * 13 * factor + time) * 64;
+            return { r, g, b, a: 255 };
+        }
+
+        function resizeCanvases() {
+            if (resizeTimeout) cancelAnimationFrame(resizeTimeout);
+            
+            resizeTimeout = requestAnimationFrame(() => {
+                const container = drawingCanvas.parentElement;
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                drawingCanvas.width = width;
+                drawingCanvas.height = height;
+                mainCanvas.width = width;
+                mainCanvas.height = height;
+                
+                const visContainer = visualizerCanvas.parentElement;
+                visualizerCanvas.width = visContainer.clientWidth;
+                visualizerCanvas.height = visContainer.clientHeight;
+                
+                generateVisualization();
+            });
+        }
+
+        let resizeTimeout;
+        window.addEventListener('resize', resizeCanvases);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                stopDraw();
+            } else if (isPlaying) {
+                startDraw();
+            }
+        });
+
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+
+        function updatePerformanceStats() {
+            const now = performance.now();
+            const elapsed = now - lastFrameTime;
+            frameCount++;
+            
+            if (elapsed >= 1000) {
+                const fps = (frameCount * 1000) / elapsed;
+                console.log(`FPS: ${fps.toFixed(1)}`);
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+        }
+
+        animate();
+        window.addEventListener('load', loadSpookySound);
+    </script>
+</body>
+</html>

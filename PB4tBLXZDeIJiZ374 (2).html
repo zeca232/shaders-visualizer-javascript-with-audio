@@ -1,0 +1,381 @@
+<html><head><base href=""/>
+    <title>Advanced Diffusion Model Generator</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #0d0d0d;
+            color: #33ff33;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: #000000;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #33ff33;
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        #visualization {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #33ff33;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #003300;
+            color: #33ff33;
+            border: 1px solid #33ff33;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button:hover {
+            background-color: #004400;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        select {
+            background-color: #003300;
+            color: #33ff33;
+            border: 1px solid #33ff33;
+            padding: 8px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        #customShader {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #0d0d0d;
+            border: 1px solid #33ff33;
+            color: #33ff33;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            height: 200px;
+            resize: vertical;
+        }
+
+        #status-message {
+            color: #33ff33;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        #loading-indicator {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #loading-indicator svg {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .preset-section {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Shader Visualization</h1>
+        
+        <div id="visualization">
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+
+        <div id="controls">
+            <button onclick="startDraw()">Start</button>
+            <button onclick="stopDraw()">Stop</button>
+            <button onclick="resetDraw()">Reset</button>
+            <button onclick="applyRandomShader()">Generate Random Shader</button>
+            <button onclick="generateMathPattern()">Generate Math Pattern</button>
+        </div>
+
+        <div class="preset-section">
+            <select id="presetSelect" onchange="applyPreset()">
+                <option value="">Select a Preset</option>
+                <option value="mandelbrot">Mandelbrot Set</option>
+                <option value="julia">Julia Set</option>
+            </select>
+        </div>
+
+        <div class="upload-section">
+            <label for="customShader">Custom Drawing Code (JavaScript):</label>
+            <textarea id="customShader" placeholder="Example: return { r: 255 * x, g: 255 * y, b: 128, a: 255 };"></textarea>
+            <button onclick="applyCustomShader()">Apply Code</button>
+        </div>
+
+        <div id="status-message"></div>
+        <div id="loading-indicator">
+            <svg width="50" height="50" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="20" stroke="#33ff33" stroke-width="4" fill="none"></circle>
+            </svg>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let animationId;
+        let time = 0.0;
+        let customDrawFunction = null;
+
+        function defaultDrawFunction(x, y, time) {
+            const r = Math.sin(x * 10 + time) * 127 + 128;
+            const g = Math.cos(y * 10 + time) * 127 + 128;
+            const b = Math.sin((x + y) * 10 + time) * 127 + 128;
+            return { r, g, b, a: 255 };
+        }
+
+        function generateVisualization() {
+            const width = canvas.width = canvas.clientWidth;
+            const height = canvas.height = canvas.clientHeight;
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+
+            for (let i = 0; i < width; i++) {
+                for (let j = 0; j < height; j++) {
+                    const x = (i / width) * 2 - 1;
+                    const y = (j / height) * 2 - 1;
+
+                    let color;
+                    try {
+                        if (customDrawFunction) {
+                            color = customDrawFunction(x, y, time);
+                        } else {
+                            color = defaultDrawFunction(x, y, time);
+                        }
+                    } catch (e) {
+                        console.error('Error in drawing function:', e);
+                        color = { r: 0, g: 0, b: 0, a: 255 };
+                    }
+
+                    const index = (j * width + i) * 4;
+                    data[index] = color.r;
+                    data[index + 1] = color.g;
+                    data[index + 2] = color.b;
+                    data[index + 3] = color.a;
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function animate() {
+            generateVisualization();
+            time += 0.02;
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function startDraw() {
+            if (!animationId) {
+                animate();
+            }
+        }
+
+        function stopDraw() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        function resetDraw() {
+            stopDraw();
+            time = 0.0;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            generateVisualization();
+        }
+
+        function generateMathFormula() {
+            const mathOperators = ['+', '-', '*'];
+            const mathFunctions = ['Math.sin', 'Math.cos', 'Math.tan', 'Math.sqrt', 'Math.abs'];
+            const constants = ['Math.PI', 'Math.E'];
+            const variables = ['x', 'y', 'time'];
+            
+            function generateTerm(depth = 0) {
+                if (depth > 3) {
+                    const choices = [...variables];
+                    if (Math.random() < 0.3) {
+                        choices.push(...constants);
+                    }
+                    return choices[Math.floor(Math.random() * choices.length)];
+                }
+                
+                if (Math.random() < 0.5) {
+                    const func = mathFunctions[Math.floor(Math.random() * mathFunctions.length)];
+                    const innerTerm = generateTerm(depth + 1);
+                    return `${func}(${innerTerm})`;
+                }
+                
+                const leftTerm = generateTerm(depth + 1);
+                const rightTerm = generateTerm(depth + 1);
+                const operator = mathOperators[Math.floor(Math.random() * mathOperators.length)];
+                return `(${leftTerm} ${operator} ${rightTerm})`;
+            }
+            
+            return generateTerm();
+        }
+
+        function generateMathPattern() {
+            try {
+                const formula1 = generateMathFormula();
+                const formula2 = generateMathFormula();
+                const formula3 = generateMathFormula();
+                
+                const mathCode = `
+                    const value1 = ${formula1};
+                    const value2 = ${formula2};
+                    const value3 = ${formula3};
+                    return {
+                        r: Math.abs(Math.sin(value1)) * 255,
+                        g: Math.abs(Math.sin(value2)) * 255,
+                        b: Math.abs(Math.sin(value3)) * 255,
+                        a: 255
+                    };
+                `;
+                
+                document.getElementById('customShader').value = mathCode;
+                applyCustomShader();
+                document.getElementById('status-message').textContent = 'Math pattern generated and applied successfully!';
+            } catch (error) {
+                console.error('Error generating math pattern:', error);
+                document.getElementById('status-message').textContent = 'Error generating math pattern. Please try again.';
+            }
+        }
+
+        function applyCustomShader() {
+            const code = document.getElementById('customShader').value;
+            if (!code.trim()) {
+                alert('Please enter code.');
+                return;
+            }
+
+            try {
+                const functionBody = `
+                    return (function(x, y, time) {
+                        ${code}
+                    })(x, y, time);
+                `;
+                customDrawFunction = new Function('x', 'y', 'time', functionBody);
+                document.getElementById('status-message').textContent = 'Code applied successfully!';
+            } catch (e) {
+                console.error('Error compiling custom code:', e);
+                document.getElementById('status-message').textContent = 'Error compiling code. Check syntax.';
+                customDrawFunction = null;
+            }
+        }
+
+        function applyRandomShader() {
+            const randomCode = `
+                const r = Math.abs(Math.sin(x * ${(Math.random() * 10).toFixed(2)} + time * ${(Math.random() * 5).toFixed(2)})) * 255;
+                const g = Math.abs(Math.cos(y * ${(Math.random() * 10).toFixed(2)} + time * ${(Math.random() * 5).toFixed(2)})) * 255;
+                const b = Math.abs(Math.sin((x + y) * ${(Math.random() * 10).toFixed(2)} + time * ${(Math.random() * 5).toFixed(2)})) * 255;
+                return { r, g, b, a: 255 };
+            `;
+            document.getElementById('customShader').value = randomCode;
+            applyCustomShader();
+        }
+
+        function applyPreset() {
+            const preset = document.getElementById('presetSelect').value;
+            const presets = {
+                mandelbrot: `
+                    const maxIter = 100;
+                    const cx = x * 2;
+                    const cy = y * 2;
+                    let zx = 0;
+                    let zy = 0;
+                    let iter = 0;
+                    
+                    while (zx * zx + zy * zy < 4 && iter < maxIter) {
+                        const tmp = zx * zx - zy * zy + cx;
+                        zy = 2 * zx * zy + cy;
+                        zx = tmp;
+                        iter++;
+                    }
+                    
+                    const color = iter === maxIter ? 0 : (iter / maxIter) * 255;
+                    return { r: color, g: color * 0.5, b: color * 0.3, a: 255 };
+                `,
+                julia: `
+                    const maxIter = 100;
+                    let zx = x * 2;
+                    let zy = y * 2;
+                    const cx = Math.sin(time * 0.5) * 0.7;
+                    const cy = Math.cos(time * 0.5) * 0.3;
+                    let iter = 0;
+                    
+                    while (zx * zx + zy * zy < 4 && iter < maxIter) {
+                        const tmp = zx * zx - zy * zy + cx;
+                        zy = 2 * zx * zy + cy;
+                        zx = tmp;
+                        iter++;
+                    }
+                    
+                    const color = iter === maxIter ? 0 : (iter / maxIter) * 255;
+                    return { r: color * 0.3, g: color * 0.5, b: color, a: 255 };
+                `
+            };
+
+            if (preset && presets[preset]) {
+                document.getElementById('customShader').value = presets[preset];
+                applyCustomShader();
+            }
+        }
+
+        // Start the animation automatically
+        startDraw();
+    </script>
+</body>
+</html>

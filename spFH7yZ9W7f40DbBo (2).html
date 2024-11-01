@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Diffusion Model Generator</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #0d0d0d;
+            color: #33ff33;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: #000000;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #33ff33;
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        #visualization {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #33ff33;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #003300;
+            color: #33ff33;
+            border: 1px solid #33ff33;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button:hover {
+            background-color: #004400;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        select {
+            background-color: #003300;
+            color: #33ff33;
+            border: 1px solid #33ff33;
+            padding: 8px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        #customEquation {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #0d0d0d;
+            border: 1px solid #33ff33;
+            color: #33ff33;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            height: 80px;
+            resize: vertical;
+        }
+
+        #status-message {
+            color: #33ff33;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        .upload-section {
+            margin: 20px 0;
+        }
+
+        #loading-indicator {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #loading-indicator svg {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .preset-section {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Advanced Diffusion Model Generator</h1>
+        
+        <div id="visualization">
+            <canvas id="diffusion-canvas"></canvas>
+        </div>
+
+        <div id="controls">
+            <button onclick="startSimulation()">Start Simulation</button>
+            <button onclick="stopSimulation()">Stop Simulation</button>
+            <button onclick="resetSimulation()">Reset Simulation</button>
+            <button onclick="generateEquation()">Generate Random Pattern</button>
+        </div>
+
+        <div class="preset-section">
+            <select id="presetSelect" onchange="applyPreset()">
+                <option value="">Select a Preset Pattern</option>
+                <option value="waves">Waves Pattern</option>
+                <option value="spiral">Spiral Pattern</option>
+                <option value="fractal">Fractal Pattern</option>
+                <option value="plasma">Plasma Pattern</option>
+            </select>
+        </div>
+
+        <div class="upload-section">
+            <label for="customEquation">Custom Mathematical Equation:</label>
+            <textarea id="customEquation" placeholder="Example: Math.sin(x * y + t)"></textarea>
+            <button onclick="applyCustomEquation()">Apply Equation</button>
+        </div>
+
+        <div id="status-message"></div>
+        <div id="loading-indicator">
+            <svg width="50" height="50" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="20" stroke="#33ff33" stroke-width="4" fill="none"></circle>
+            </svg>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('diffusion-canvas');
+        const ctx = canvas.getContext('2d');
+        let animationId;
+        let customEquation = null;
+        let time = 0;
+
+        const equationPresets = {
+            waves: "Math.sin(x * 0.5) * Math.cos(y * 0.5 + t)",
+            spiral: "Math.sin(Math.sqrt(x*x + y*y) - t*2) * Math.cos(Math.atan2(y,x) + t)",
+            fractal: "Math.sin(x * x - y * y) * Math.cos(2 * x * y) * Math.sin(t)",
+            plasma: "Math.sin(x * Math.cos(t)) * Math.cos(y * Math.sin(t)) * Math.sin(Math.sqrt(x*x + y*y))"
+        };
+
+        function generateRandomEquation() {
+            const operators = ['+', '-', '*'];
+            const functions = ['Math.sin', 'Math.cos', 'Math.tan'];
+            const variables = ['x', 'y', 't'];
+            
+            function generateTerm(depth = 0) {
+                if (depth > 2) {
+                    if (Math.random() < 0.7) {
+                        return variables[Math.floor(Math.random() * variables.length)];
+                    }
+                    return (Math.random() * 2).toFixed(2);
+                }
+                
+                const fn = functions[Math.floor(Math.random() * functions.length)];
+                const op = operators[Math.floor(Math.random() * operators.length)];
+                const term1 = generateTerm(depth + 1);
+                const term2 = generateTerm(depth + 1);
+                
+                return `${fn}(${term1} ${op} ${term2})`;
+            }
+            
+            const numTerms = 2 + Math.floor(Math.random() * 2);
+            let equation = generateTerm();
+            
+            for (let i = 1; i < numTerms; i++) {
+                const op = operators[Math.floor(Math.random() * operators.length)];
+                equation += ` ${op} ${generateTerm()}`;
+            }
+            
+            return equation;
+        }
+
+        function startSimulation() {
+            if (animationId) return;
+            animate();
+        }
+
+        function stopSimulation() {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+
+        function resetSimulation() {
+            stopSimulation();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            time = 0;
+        }
+
+        function applyPreset() {
+            const preset = document.getElementById('presetSelect').value;
+            if (preset && equationPresets[preset]) {
+                document.getElementById('customEquation').value = equationPresets[preset];
+                applyCustomEquation();
+            }
+        }
+
+        function applyCustomEquation() {
+            const equationInput = document.getElementById('customEquation').value;
+            if (!equationInput.trim()) {
+                alert('Please enter an equation.');
+                return;
+            }
+            try {
+                customEquation = new Function('x', 'y', 't', `return ${equationInput};`);
+                document.getElementById('status-message').textContent = 'Equation applied successfully!';
+            } catch (e) {
+                alert('Invalid equation. Please check the syntax.');
+                customEquation = null;
+            }
+        }
+
+        function animate() {
+            time += 0.01;
+            generateVisualization();
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function generateVisualization() {
+            const width = canvas.width = canvas.clientWidth;
+            const height = canvas.height = canvas.clientHeight;
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+
+            for (let i = 0; i < width; i++) {
+                for (let j = 0; j < height; j++) {
+                    const x = (i / width) * 4 - 2;
+                    const y = (j / height) * 4 - 2;
+                    let value;
+                    try {
+                        if (customEquation) {
+                            value = customEquation(x, y, time);
+                        } else {
+                            value = defaultEquation(x, y, time);
+                        }
+                    } catch (e) {
+                        value = 0;
+                    }
+                    const index = (j * width + i) * 4;
+                    const r = Math.sin(value) * 127 + 128;
+                    const g = Math.sin(value + 2 * Math.PI / 3) * 127 + 128;
+                    const b = Math.sin(value + 4 * Math.PI / 3) * 127 + 128;
+
+                    data[index] = r;
+                    data[index + 1] = g;
+                    data[index + 2] = b;
+                    data[index + 3] = 255;
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function defaultEquation(x, y, t) {
+            return Math.sin(x * Math.cos(t)) * Math.cos(y * Math.sin(t)) + 
+                   Math.sin(Math.sqrt(x*x + y*y) - t*2) * 
+                   Math.cos(Math.atan2(y,x) + t);
+        }
+
+        async function generateEquation() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const statusMessage = document.getElementById('status-message');
+            loadingIndicator.style.display = 'block';
+            statusMessage.textContent = '';
+
+            try {
+                const equation = generateRandomEquation();
+                document.getElementById('customEquation').value = equation;
+                applyCustomEquation();
+                statusMessage.textContent = 'Random equation generated and applied successfully!';
+            } catch (error) {
+                console.error('Error generating equation:', error);
+                statusMessage.textContent = 'Error generating equation. Please try again.';
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        // Start the simulation automatically
+        startSimulation();
+    </script>
+</body>
+</html>
